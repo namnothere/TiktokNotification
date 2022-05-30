@@ -22,18 +22,18 @@ class Database():
                 time.sleep(10)
                 return self.connectDB()
 
-    def getAllVideos(self):
-        self.connectDB()
-        db = self.client.TikTok.bae.find_one({'id':'tiktok'})
-        return db['videos']
+    # def getAllVideos(self):
+    #     self.connectDB()
+    #     db = self.client.TikTok.bae.find_one({'id':'tiktok'})
+    #     return db['videos']
 
-    def videoExist(self, videoID):
+    def videoExist(self, username, videoID):
         self.connectDB()
         db = self.client.TikTok.bae.find_one({'id':'tiktok'})
-        if videoID in db['videos']:
-            return True
-        else:
+        if username not in db['videos'] or videoID not in db['videos'][username]:
             return False
+        else:
+            return True
 
     def addVideo(self, video):
         self.connectDB()
@@ -56,7 +56,7 @@ class Database():
             "screenName": screenName,
             "avatar": avatar
         }
-        self.client.TikTok.bae.find_one_and_update({'id':'tiktok'},{'$set': {f'videos.{videoID}': content}}, return_document = pymongo.ReturnDocument.AFTER)
+        self.client.TikTok.bae.find_one_and_update({'id':'tiktok'},{'$set': {f'videos.{username}.{videoID}': content}}, return_document = pymongo.ReturnDocument.AFTER)
         return True
 
     def setUsername(self, username):
@@ -66,7 +66,7 @@ class Database():
 
     def setChannel(self, channelID):
         self.connectDB()
-        db = self.client.TikTok.bae.find_one_and_update({'id':'tiktok'},{'$set': {'channel': channelID}}, return_document = pymongo.ReturnDocument.AFTER)
+        self.client.TikTok.bae.find_one_and_update({'id':'tiktok'},{'$set': {'channel': channelID}}, return_document = pymongo.ReturnDocument.AFTER)
         return True
 
     def setMessage(self, message):
@@ -74,10 +74,14 @@ class Database():
         self.client.TikTok.bae.find_one_and_update({'id':'tiktok'},{'$set': {'message': message}}, return_document = pymongo.ReturnDocument.AFTER)
         return True
 
-    def getVideo(self, id):
+    def getVideo(self, username, id):
         self.connectDB()
-        db = self.client.TikTok.bae.find_one({'id':'tiktok'})
-        return db['videos'][str(id)]
+        try:
+            db = self.client.TikTok.bae.find_one({'id':'tiktok'})
+            return db['videos'][str(username)][str(id)]
+        except Exception as e:
+            print("getVideo [Error]: " + str(e))
+            return False
 
     def getUsername(self):
         self.connectDB()
@@ -123,7 +127,7 @@ class Database():
     
     
 
-    def updateVideoURL(self, videoID, videoURL):
+    def updateVideoURL(self, username, videoID, videoURL):
         """update video url (in discord) into database
 
         
@@ -141,9 +145,9 @@ class Database():
         """
         try:
             self.connectDB()
-            dict = self.getVideo(videoID)
+            dict = self.getVideo(username, videoID)
             dict['video_url'] = videoURL
-            self.client.TikTok.bae.find_one_and_update({'id':'tiktok'},{'$set': {f'videos.{videoID}': dict}}, return_document = pymongo.ReturnDocument.AFTER)
+            self.client.TikTok.bae.find_one_and_update({'id':'tiktok'},{'$set': {f'videos.{username}.{videoID}': dict}}, return_document = pymongo.ReturnDocument.AFTER)
             return True
         except TypeError:
             raise TypeError("videoID or videoURL is not found")
@@ -151,3 +155,14 @@ class Database():
             print("updateVideoURL [Error]: " + str(e))
             return False
 
+    def clearDB(self):
+        
+        self.connectDB()
+
+        self.client.TikTok.bae.find_one_and_update({'id':'tiktok'},{'$set': {'videos': {}}})
+        self.client.TikTok.bae.find_one_and_update({'id':'tiktok'},{'$set': {'username': ""}})
+        self.client.TikTok.bae.find_one_and_update({'id':'tiktok'},{'$set': {'channel': ""}})
+        self.client.TikTok.bae.find_one_and_update({'id':'tiktok'},{'$set': {'message': ""}})
+        self.client.TikTok.bae.find_one_and_update({'id':'tiktok'},{'$set': {'loop': False}})
+
+        return True

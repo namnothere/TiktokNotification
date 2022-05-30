@@ -69,9 +69,13 @@ async def add(ctx, left: int, right: int):
 async def setuser(ctx, user:str):
     global username
     username = user
+    exist = db.getUserID(username)
+    if exist == False:
+        await ctx.send("We currently do not support this user.")
+        return
     db.setUsername(username)
+    print("Username: " + username)
     await ctx.send(f"Added {user}", ephemeral=False) # Change ephemeral to True if you want only the author to see that message
-
 
 @bot.hybrid_command(description = "Set channel to send notification.", aliases=['sc', 'addchannel'])
 @commands.has_permissions(administrator = True)
@@ -147,7 +151,7 @@ async def newVideos():
     if (c):
         for video in tiktok.newVideos:
             id = video['itemInfos']['id']
-            v = db.getVideo(id)
+            v = db.getVideo(username, id)
             createTime = v["createTime"]
 
             url = None
@@ -160,10 +164,10 @@ async def newVideos():
             if url == False:
                 originurl = f'https://www.tiktok.com/@{username}/video/{id}'
                 await bot.get_channel(int(channelID)).send(f"{msg} at <t:{createTime}:f> \n {originurl}")
-                db.updateVideoURL(id, url)
+                db.updateVideoURL(username, id, url)
                 return
-            db.updateVideoURL(id, url)
-            url = f"{embedURL}/{id}"
+            db.updateVideoURL(username, id, url)
+            url = f"{embedURL}/{username}/{id}"
             await asyncio.sleep(2)
             await bot.get_channel(int(channelID)).send(f"{msg} at <t:{createTime}:f> \n {url}")
 
@@ -240,5 +244,11 @@ async def sync(ctx):
     bot.tree.copy_global_to(guild=ctx.guild)
     await bot.tree.sync(guild=ctx.guild)
     await ctx.send("Synced!", ephemeral=True)
+
+@bot.command()
+@commands.is_owner()
+async def clear(ctx):
+    db.clearDB()
+    await ctx.send("Cleared", ephemeral=True)
 
 bot.run(os.environ.get("TOKEN"))

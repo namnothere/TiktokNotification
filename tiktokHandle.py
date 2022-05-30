@@ -50,7 +50,8 @@ class TikTokHandle():
             newV = False
             for video in self.user['itemListData']:
                 id = video['itemInfos']['id']
-                if not self.db.videoExist(id):
+
+                if not self.db.videoExist(self.username, id):
                     download(self.username, id)
                     self.newVideos.append(video)
                     self.db.addVideo(video)
