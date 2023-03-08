@@ -1,12 +1,13 @@
 import asyncio
-from TiktokApi import *
+import os
+import discord
+
+from discord.ext.commands.context import Context
 from databaseHandle import Database
 from tiktokHandle import TikTokHandle
-import discord
 from discord.ext import commands, tasks
 from discord.ext.commands.errors import CommandNotFound
 from discord import app_commands
-import os
 from dotenv import load_dotenv
 from Streamable import StreamableHandle
 from pystreamable.exceptions import StreamableApiServerException
@@ -59,14 +60,14 @@ async def on_ready():
 
 
 @bot.command()
-async def add(ctx, left: int, right: int):
+async def add(ctx: Context, left: int, right: int):
     """Adds two numbers together."""
     await ctx.send(left + right)
 
 @bot.hybrid_command(description = "Set user to follow.", aliases = ['su', 'adduser'])
 @commands.has_permissions(administrator = True)
 @app_commands.describe(user="Username")
-async def setuser(ctx, user:str):
+async def setuser(ctx: Context, user:str):
     global username
     username = user
     exist = db.getUserID(username)
@@ -80,7 +81,7 @@ async def setuser(ctx, user:str):
 @bot.hybrid_command(description = "Set channel to send notification.", aliases=['sc', 'addchannel'])
 @commands.has_permissions(administrator = True)
 @app_commands.describe(channelid="Channel")
-async def setchannel(ctx, channelid = None):
+async def setchannel(ctx: Context, channelid = None):
     global channelID
     channelID = channelid
     if (channelID == None):
@@ -99,7 +100,7 @@ async def setchannel(ctx, channelid = None):
 @bot.hybrid_command(description = "Set default message.", aliases = ['sm'])
 @commands.has_permissions(administrator = True)
 @app_commands.describe(message="Message")
-async def setmessage(ctx, message:str):
+async def setmessage(ctx: Context, message:str):
     global msg
     msg = message
     db.setMessage(message)
@@ -108,10 +109,10 @@ async def setmessage(ctx, message:str):
 @bot.hybrid_command(description = "View current stalked user.", aliases=['ul', 'users'])
 async def userlist(ctx):
     users = db.getUsername()
-    await ctx.send(f"Stalked user: {users}", ephemeral=False)
+    await ctx.send(f"The poor girl being stalked is: {users}", ephemeral=False)
 
 @bot.event
-async def on_command_error(ctx, error):
+async def on_command_error(ctx: Context, error):
     if isinstance(error, CommandNotFound):
         await ctx.send("Command not found", ephemeral=False)
     raise error
@@ -120,7 +121,7 @@ async def on_command_error(ctx, error):
 
 @bot.hybrid_command(description = "Start stalking.", aliases=['s'])
 @commands.has_permissions(administrator = True)
-async def start(ctx):
+async def start(ctx: Context):
     db.setloop(True)
     if newVideos.is_running():
         await ctx.send("Already running", ephemeral=True)
@@ -131,7 +132,7 @@ async def start(ctx):
 
 @bot.hybrid_command(description = "Stop stalking.", aliases=['st'])
 @commands.has_permissions(administrator = True)
-async def stop(ctx):
+async def stop(ctx: Context):
     db.setloop(False)
     #cancel loop
     if newVideos.is_running():
@@ -142,7 +143,7 @@ async def stop(ctx):
 
 
 
-@tasks.loop(seconds = 60 * 2)
+@tasks.loop(hours=24*2)
 async def newVideos():
     global msg, ch, username, userid, Streamable
 
@@ -150,7 +151,7 @@ async def newVideos():
     c = tiktok.sortVideos()
     if (c):
         for video in tiktok.newVideos:
-            id = video['itemInfos']['id']
+            id = video['video_id']
             v = db.getVideo(username, id)
             createTime = v["createTime"]
 
@@ -220,8 +221,8 @@ async def uploadToStreamable(file):
 
 async def uploadToDiscord(file):
     """
-    Uploads file to discord.
-    return message attachment object
+        Uploads file to discord.
+        return message attachment object
     """
     try:
         m = await bot.get_channel(ch).send(file = discord.File(f"{file}.mp4"))
@@ -232,7 +233,7 @@ async def uploadToDiscord(file):
 
 @bot.command()
 @commands.is_owner()
-async def upload(ctx, id):
+async def upload(ctx: Context, id):
     try:
         await ctx.send(file = discord.File(f"{id}.mp4"))
     except Exception as e:
@@ -240,14 +241,14 @@ async def upload(ctx, id):
 
 @bot.command()
 @commands.is_owner()
-async def sync(ctx):
+async def sync(ctx: Context):
     bot.tree.copy_global_to(guild=ctx.guild)
     await bot.tree.sync(guild=ctx.guild)
     await ctx.send("Synced!", ephemeral=True)
 
 @bot.command()
 @commands.is_owner()
-async def clear(ctx):
+async def clear(ctx: Context):
     db.clearDB()
     await ctx.send("Cleared", ephemeral=True)
 

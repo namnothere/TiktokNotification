@@ -9,7 +9,7 @@ DBclient = os.getenv("CLIENT")
 
 class Database():
     def __init__(self):
-        self.client = None
+        self.client: pymongo.MongoClient = None
         self.connected = False
 
     def connectDB(self):
@@ -37,15 +37,17 @@ class Database():
 
     def addVideo(self, video):
         self.connectDB()
-        videoID = video['itemInfos']['id']
-        desc = video['itemInfos']['text']
-        createTime = video['itemInfos']['createTime']
-        cover = video['itemInfos']['coversOrigin'][0]
-        width = video['itemInfos']['video']['videoMeta']['width']
-        height = video['itemInfos']['video']['videoMeta']['height']
-        username = video['authorInfos']['uniqueId']
-        screenName = video['authorInfos']['nickName']
-        avatar = video['authorInfos']['coversLarger'][0]
+        videoID = video['video_id']
+        desc = video['title']
+        createTime = video['create_time']
+        cover = video['origin_cover']
+        width = "1080"
+        height = "1920"
+        # width = video['itemInfos']['video']['videoMeta']['width']
+        # height = video['itemInfos']['video']['videoMeta']['height']
+        username = video['author']['unique_id']
+        screenName = video['author']['nickname']
+        avatar = video['author']['avatar']
         content = {
             "desc": desc,
             "createTime": createTime,

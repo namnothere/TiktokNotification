@@ -1,11 +1,11 @@
 from databaseHandle import Database
-from TiktokApi import *
+from API.api import API
 from Download import download
 import requests
 
 class TikTokHandle():
     def __init__(self, db = None, username = None, userid = None) -> None:
-        self.api = Tiktok()
+        self.api = API()
         self.username = username
         self.userid = userid
         self.user = None
@@ -16,11 +16,12 @@ class TikTokHandle():
 
     def getUserID(self):
         """
-        getUserFeed won't work if we pass username so I figured I'd make a function to get the userid from another webserver
-        and then I think it maybe easier to just pass everyone id to DB and query it from there.
+            getUserFeed won't work if we pass username so I figured I'd make a function to get the userid from another webserver
+            and then I think it maybe easier to just pass everyone id to DB and query it from there.
         """
         if self.db.getUserID(self.username) != False:
             self.userid = self.db.getUserID(self.username)
+            print("User ID: " + self.userid)
             return self.userid
         
         BASE_URL = "https://getUserID.namnothere.repl.co/getuserid"
@@ -37,7 +38,8 @@ class TikTokHandle():
         try:
             if self.userid == None:
                 self.getUserID()
-            self.user = self.api.getUserFeed(userid=self.userid, use_selenium=False)[0]
+            # self.user = self.api.getInfoUser(username=self.userid)
+            self.user = self.api.getUserFeed(user_id=self.userid)
             return self.user
         except Exception as e:
             print("getUser [Error]: " + str(e))
@@ -48,9 +50,8 @@ class TikTokHandle():
             if self.user == None:
                 self.getUser()
             newV = False
-            for video in self.user['itemListData']:
-                id = video['itemInfos']['id']
-
+            for video in self.user['videos']:
+                id = video['video_id']
                 if not self.db.videoExist(self.username, id):
                     download(self.username, id)
                     self.newVideos.append(video)
