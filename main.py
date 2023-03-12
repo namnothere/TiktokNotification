@@ -1,5 +1,7 @@
 import asyncio
+import datetime
 import os
+import time
 import discord
 
 from discord.ext.commands.context import Context
@@ -62,7 +64,7 @@ async def on_ready():
 @bot.command()
 async def add(ctx: Context, left: int, right: int):
     """Adds two numbers together."""
-    await ctx.send(left + right)
+    await ctx.reply(left + right)
 
 @bot.hybrid_command(description = "Set user to follow.", aliases = ['su', 'adduser'])
 @commands.has_permissions(administrator = True)
@@ -72,30 +74,38 @@ async def setuser(ctx: Context, user:str):
     username = user
     exist = db.getUserID(username)
     if exist == False:
-        await ctx.send("We currently do not support this user.")
+        await ctx.reply("We currently do not support this user.")
         return
     db.setUsername(username)
     print("Username: " + username)
-    await ctx.send(f"Added {user}", ephemeral=False) # Change ephemeral to True if you want only the author to see that message
+    await ctx.reply(f"Added {user}", ephemeral=False) # Change ephemeral to True if you want only the author to see that message
 
 @bot.hybrid_command(description = "Set channel to send notification.", aliases=['sc', 'addchannel'])
 @commands.has_permissions(administrator = True)
 @app_commands.describe(channelid="Channel")
-async def setchannel(ctx: Context, channelid = None):
+async def setchannel(ctx: Context, channelid: str):
     global channelID
-    channelID = channelid
+    # channelID = channelid
     if (channelID == None):
         channelID = ctx.channel.id
-    elif ctx.message.channel_mentions:
-        channelID = ctx.message.channel_mentions[0].id
+    # elif ctx.message.channel_mentions:
+    #     channelID = str(ctx.message.channel_mentions[0].id)
+    elif channelid != "":
+        # check if channel exists
+        channel = bot.get_channel(int(channelid))
+        if channel == None:
+            await ctx.reply("Please enter a valid channel", ephemeral=True)
+            return
+        channelID = channelid
     else:
-        await ctx.send("Please enter a valid channel", ephemeral=False)
+        print(ctx.message.channel_mentions)
+        await ctx.reply("Please enter a valid channel", ephemeral=True)
         return
 
     db.setChannel(channelID)
 
     channel = bot.get_channel(int(channelID))
-    await ctx.send(f"Set channel to {channel.mention}", ephemeral=True)
+    await ctx.reply(f"Set channel to {channel.mention}", ephemeral=True)
 
 @bot.hybrid_command(description = "Set default message.", aliases = ['sm'])
 @commands.has_permissions(administrator = True)
@@ -104,12 +114,12 @@ async def setmessage(ctx: Context, message:str):
     global msg
     msg = message
     db.setMessage(message)
-    await ctx.send(f"Added `{message}` as content when new video is posted", ephemeral=False) # Change ephemeral to True if you want only the author to see that message
+    await ctx.reply(f"Added `{message}` as content when new video is posted", ephemeral=False) # Change ephemeral to True if you want only the author to see that message
 
 @bot.hybrid_command(description = "View current stalked user.", aliases=['ul', 'users'])
 async def userlist(ctx):
     users = db.getUsername()
-    await ctx.send(f"The poor girl being stalked is: {users}", ephemeral=False)
+    await ctx.reply(f"The poor girl being stalked is: {users}", ephemeral=False)
 
 @bot.event
 async def on_command_error(ctx: Context, error):
@@ -124,10 +134,10 @@ async def on_command_error(ctx: Context, error):
 async def start(ctx: Context):
     db.setloop(True)
     if newVideos.is_running():
-        await ctx.send("Already running", ephemeral=True)
+        await ctx.reply("Already running", ephemeral=True)
     else:
         newVideos.start()
-        await ctx.send("Started", ephemeral=True)
+        await ctx.reply("Started", ephemeral=True)
 
 
 @bot.hybrid_command(description = "Stop stalking.", aliases=['st'])
@@ -136,14 +146,16 @@ async def stop(ctx: Context):
     db.setloop(False)
     #cancel loop
     if newVideos.is_running():
-        newVideos.stop()
-        await ctx.send("Stopped", ephemeral=True)
+        newVideos.cancel()
+        # Cancel immediately
+        # newVideos.stop()
+        await ctx.reply("Stopped", ephemeral=True)
     else:
-        await ctx.send("Loop is not running", ephemeral=True)
+        await ctx.reply("Loop is not running", ephemeral=True)
 
 
 
-@tasks.loop(hours=24*2)
+@tasks.loop(hours=24)
 async def newVideos():
     global msg, ch, username, userid, Streamable
 
@@ -168,9 +180,30 @@ async def newVideos():
                 db.updateVideoURL(username, id, url)
                 return
             db.updateVideoURL(username, id, url)
-            url = f"{embedURL}/{username}/{id}"
+            url = f"{embedURL}/video/{username}/{id}"
             await asyncio.sleep(2)
             await bot.get_channel(int(channelID)).send(f"{msg} at <t:{createTime}:f> \n {url}")
+
+@newVideos.before_loop
+async def before():
+    # Wait until 8am JST to start the loop
+    # Get current utc time
+    utc = datetime.datetime.utcnow()
+    # Convert to JST
+    jst = utc + datetime.timedelta(hours=9)
+    # Get the hour
+    hour = jst.hour
+    # If it's not 8am, wait
+    if hour != 8:
+        # if negative, wait until 8am tomorrow
+        if hour > 8:
+            print(f"Waiting {(24 - hour + 8)} hours to start the loop")
+            await asyncio.sleep((24 - hour + 8) * 3600)
+        else:
+            print(f"Waiting {(8 - hour)} hours to start the loop")
+            await asyncio.sleep((8 - hour) * 3600)
+
+    await bot.wait_until_ready()
 
 def uploadOption():
     """
@@ -197,9 +230,13 @@ async def DiscordfileHandle(file):
     Eiter return file url or None if file is too large
     """
     size = os.path.getsize(f"{file}.mp4") 
-    if size > 1048576 * 7.9:
-        print("File is too large")
-        return False
+    if size > 1048576 * 8:
+        print("File is too big")
+        # If file is too large, upload to streamable
+        print("Try uploading to streamable")
+        url = await uploadToStreamable(file)
+        return url
+        # return False
     else:
         url = await uploadToDiscord(file)
         return url

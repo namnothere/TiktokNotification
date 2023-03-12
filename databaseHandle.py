@@ -15,7 +15,7 @@ class Database():
     def connectDB(self):
         if not self.connected:
             try:
-                self.client = pymongo.MongoClient(DBclient, serverSelectionTimeoutMS=3000)
+                self.client = pymongo.MongoClient(DBclient, serverSelectionTimeoutMS=30000, connectTimeoutMS=30000, socketTimeoutMS=None, connect=False, maxPoolsize=1)
                 self.connected = True
             except Exception as e:
                 print("connectDB [Error]: " + str(e))
@@ -86,9 +86,13 @@ class Database():
             return False
 
     def getUsername(self):
-        self.connectDB()
-        db = self.client.TikTok.bae.find_one({'id':'tiktok'})
-        return db['username']
+        try:
+            self.connectDB()
+            # db = self.client.TikTok.bae.find_one({'id':'tiktok'})
+            db = self.client['TikTok'].get_collection('bae').find_one({'id':'tiktok'})
+            return db['username']
+        except Exception as e:
+            print("getUsername [Error]: " + str(e))
 
     def getChannel(self):
         self.connectDB()
