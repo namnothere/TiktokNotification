@@ -291,7 +291,7 @@ async def clear(ctx: Context):
 
 @bot.command()
 @commands.is_owner()
-async def scan(ctx: Context, id):
+async def scan(ctx: Context):
     try:
         tiktok = TikTokHandle(db, username, userid=userid)
         c = tiktok.sortVideos()
