@@ -4,3 +4,4 @@ pystreamable==1.0.1
 python-dotenv==1.0.0
 requests==2.27.1
 yt_dlp==2022.1.21
+dnspython==2.3.0
