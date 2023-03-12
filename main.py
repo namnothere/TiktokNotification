@@ -289,4 +289,23 @@ async def clear(ctx: Context):
     db.clearDB()
     await ctx.send("Cleared", ephemeral=True)
 
+@bot.command()
+@commands.is_owner()
+async def scan(ctx: Context, id):
+    try:
+        tiktok = TikTokHandle(db, username, userid=userid)
+        c = tiktok.sortVideos()
+        if (c):
+            newVideoMsg = ""
+            for video in tiktok.newVideos:
+                id = video['video_id']
+                v = db.getVideo(username, id)
+                createTime = v["createTime"]
+                newVideoMsg += f"{msg} at <t:{createTime}:f> \n https://www.tiktok.com/@{username}/video/{id}\n"
+
+            await ctx.reply(newVideoMsg, ephemeral=True)
+                    
+    except Exception as e:
+        await ctx.reply("Error: " + str(e))
+
 bot.run(os.environ.get("TOKEN"))
