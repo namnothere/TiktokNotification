@@ -239,7 +239,7 @@ async def before():
             # create datetime object for 8am tomorrow
             tomorrow = datetime.datetime.combine(jst + datetime.timedelta(days=1), datetime.time(6, 5))
             # Get the difference between now and 8am tomorrow
-            diff = tomorrow - datetime.datetime.now()
+            diff = tomorrow - datetime.datetime.utcnow() + datetime.timedelta(hours=9)
 
             # Seconds to hours and minutes
 
@@ -250,13 +250,13 @@ async def before():
         else:
             
             # create datetime object for 8am today
-            today = datetime.datetime.combine(jst, datetime.time(6, 5))
+            todayJST = datetime.datetime.combine(jst, datetime.time(6, 5))
 
             # Get the difference between now and 8am today
-            diff = today - datetime.datetime.now()
+            diff = todayJST - datetime.datetime.utcnow() + datetime.timedelta(hours=9)
 
 
-            print(f"Waiting {(8 - hour)} hours (appx {diff.seconds}s) to start the loop [Epoch {today.timestamp()}]")
+            print(f"Waiting {(8 - hour)} hours (appx {diff.seconds}s) to start the loop [Epoch {todayJST.timestamp()}]")
             # await asyncio.sleep((8 - hour) * 3600)
             await asyncio.sleep(diff.seconds)
 
