@@ -5,6 +5,7 @@ import time
 import discord
 
 from discord.ext.commands.context import Context
+import requests
 from databaseHandle import Database
 from tiktokHandle import TikTokHandle
 from discord.ext import commands, tasks
@@ -79,6 +80,12 @@ async def setuser(ctx: Context, user:str):
     db.setUsername(username)
     print("Username: " + username)
     await ctx.reply(f"Added {user}", ephemeral=False) # Change ephemeral to True if you want only the author to see that message
+@setuser.error
+async def setuser_error(ctx: Context, error):
+    if isinstance(error, commands.MissingPermissions):
+        await ctx.reply("You don't have permission to do that", ephemeral=True)
+    else:
+        await ctx.reply("An error occured", ephemeral=True)
 
 @bot.hybrid_command(description = "Set channel to send notification.", aliases=['sc', 'addchannel'])
 @commands.has_permissions(administrator = True)
@@ -106,6 +113,12 @@ async def setchannel(ctx: Context, channelid: str):
 
     channel = bot.get_channel(int(channelID))
     await ctx.reply(f"Set channel to {channel.mention}", ephemeral=True)
+@setchannel.error
+async def setchannel_error(ctx: Context, error):
+    if isinstance(error, commands.MissingPermissions):
+        await ctx.reply("You don't have permission to do that", ephemeral=True)
+    else:
+        await ctx.reply("An error occured", ephemeral=True)
 
 @bot.hybrid_command(description = "Set default message.", aliases = ['sm'])
 @commands.has_permissions(administrator = True)
@@ -115,16 +128,22 @@ async def setmessage(ctx: Context, message:str):
     msg = message
     db.setMessage(message)
     await ctx.reply(f"Added `{message}` as content when new video is posted", ephemeral=False) # Change ephemeral to True if you want only the author to see that message
+@setmessage.error
+async def setmessage_error(ctx: Context, error):
+    if isinstance(error, commands.MissingPermissions):
+        await ctx.reply("You don't have permission to do that", ephemeral=True)
+    else:
+        await ctx.reply("An error occured", ephemeral=True)
 
 @bot.hybrid_command(description = "View current stalked user.", aliases=['ul', 'users'])
-async def userlist(ctx):
+async def userlist(ctx: Context):
     users = db.getUsername()
     await ctx.reply(f"The poor girl being stalked is: {users}", ephemeral=False)
 
 @bot.event
 async def on_command_error(ctx: Context, error):
     if isinstance(error, CommandNotFound):
-        await ctx.send("Command not found", ephemeral=False)
+        await ctx.send("Command not found", ephemeral=True)
     raise error
 
 # https://www.tiktok.com/@hakosbaelz_holoen/video/7100729819205340418
@@ -138,7 +157,13 @@ async def start(ctx: Context):
     else:
         newVideos.start()
         await ctx.reply("Started", ephemeral=True)
-
+@start.error
+async def start_error(ctx: Context, error):
+    if isinstance(error, commands.MissingPermissions):
+        await ctx.reply("You don't have permission to do that", ephemeral=True)
+    else:
+        print(error)
+        await ctx.reply("Something went wrong", ephemeral=True)
 
 @bot.hybrid_command(description = "Stop stalking.", aliases=['st'])
 @commands.has_permissions(administrator = True)
@@ -152,7 +177,13 @@ async def stop(ctx: Context):
         await ctx.reply("Stopped", ephemeral=True)
     else:
         await ctx.reply("Loop is not running", ephemeral=True)
-
+@stop.error
+async def stop_error(ctx: Context, error):
+    if isinstance(error, commands.MissingPermissions):
+        await ctx.reply("You don't have permission to do that", ephemeral=True)
+    else:
+        print(error)
+        await ctx.reply("Something went wrong", ephemeral=True)
 
 
 @tasks.loop(hours=24)
@@ -181,7 +212,14 @@ async def newVideos():
                 return
             db.updateVideoURL(username, id, url)
             url = f"{embedURL}/video/{username}/{id}"
-            await asyncio.sleep(2)
+
+            # Ping the server before sending the url (send request to the url)
+            r = requests.get(url)
+            if r.status_code == 200:
+                # If the request is successful, send the url
+                print("Sending url")
+
+            await asyncio.sleep(5)
             await bot.get_channel(int(channelID)).send(f"{msg} at <t:{createTime}:f> \n {url}")
 
 @newVideos.before_loop
@@ -195,13 +233,34 @@ async def before():
     hour = jst.hour
     # If it's not 8am, wait
     if hour != 8:
-        # if negative, wait until 8am tomorrow
+
+        # If it's after 8am, wait until 8am tomorrow
         if hour > 8:
-            print(f"Waiting {(24 - hour + 8)} hours to start the loop")
-            await asyncio.sleep((24 - hour + 8) * 3600)
+            # create datetime object for 8am tomorrow
+            tomorrow = datetime.datetime.combine(datetime.date.today() + datetime.timedelta(days=1), datetime.time(6, 5))
+            # Get the difference between now and 8am tomorrow
+            diff = tomorrow - datetime.datetime.now()
+
+            # Seconds to hours and minutes
+
+            print(f"Waiting {(24 - hour + 8)} hours (appx {diff.seconds}s) to start the loop [Epoch {today.timestamp()}]")
+
+            # await asyncio.sleep((24 - hour + 8) * 3600)
+            await asyncio.sleep(diff.seconds)
         else:
-            print(f"Waiting {(8 - hour)} hours to start the loop")
-            await asyncio.sleep((8 - hour) * 3600)
+            
+            # create datetime object for 8am today
+            today = datetime.datetime.combine(datetime.date.today(), datetime.time(6, 5))
+
+            # Get the difference between now and 8am today
+            diff = today - datetime.datetime.now()
+
+            # datetime to epoch
+            print(today.utctimetuple())
+
+            print(f"Waiting {(8 - hour)} hours (appx {diff.seconds}s) to start the loop [Epoch {today.timestamp()}]")
+            # await asyncio.sleep((8 - hour) * 3600)
+            await asyncio.sleep(diff.seconds)
 
     await bot.wait_until_ready()
 
@@ -304,8 +363,71 @@ async def scan(ctx: Context):
                 newVideoMsg += f"{msg} at <t:{createTime}:f> \n https://www.tiktok.com/@{username}/video/{id}\n"
 
             await ctx.reply(newVideoMsg, ephemeral=True)
-                    
+
     except Exception as e:
         await ctx.reply("Error: " + str(e))
+
+@bot.command()
+@commands.is_owner()
+async def forcerun(ctx: Context):
+    # Run task without waiting for 8am JST
+    try:
+        global username, userid, channelID, msg, Streamable
+        tiktok = TikTokHandle(db, username, userid=userid)
+        c = tiktok.sortVideos()
+        if (c):
+            for video in tiktok.newVideos:
+                id = video['video_id']
+                v = db.getVideo(username, id)
+                createTime = v["createTime"]
+
+                url = None
+
+                if Streamable == False:
+                    url = await DiscordfileHandle(id)
+                else:
+                    url = await uploadToStreamable(id)
+                
+                if url == False:
+                    originurl = f'https://www.tiktok.com/@{username}/video/{id}'
+                    await bot.get_channel(int(channelID)).send(f"{msg} at <t:{createTime}:f> \n {originurl}")
+                    db.updateVideoURL(username, id, url)
+                    return
+                db.updateVideoURL(username, id, url)
+                url = f"{embedURL}/video/{username}/{id}"
+                await asyncio.sleep(10)
+                await bot.get_channel(int(channelID)).send(f"{msg} at <t:{createTime}:f> \n {url}")
+    except Exception as e:
+        await ctx.reply("Error: " + str(e), ephemeral=True)
+
+@bot.command()
+@commands.is_owner()
+async def info(ctx: Context):
+    # reply info about the current loop
+    global username, userid, channelID, msg, Streamable
+    embed = discord.Embed(title="Stalk Info", color=0x00ff00)
+    embed.add_field(name="Username", value=username, inline=True)
+    embed.add_field(name="User ID", value=userid, inline=True)
+    # embed.add_field(name="\u200b", value="\u200b", inline=False)
+
+    try:
+        channel = bot.get_channel(channelID)
+        embed.add_field(name="Channel ID", value=f"{channel.mention} ({channel.name})", inline=True)
+    except Exception as e:
+        print(f"[info] Channel not found: {e}")
+        embed.add_field(name="Channel ID", value=f"{channelID} (Channel not found)", inline=True)
+
+    embed.add_field(name="Message", value=msg, inline=True)
+    
+    embed.add_field(name="Upload Option", value=Streamable, inline=True)
+    embed.add_field(name="Loop Status", value=newVideos.is_running(), inline=True)
+
+    await ctx.reply(embed=embed, ephemeral=True)
+
+@info.error
+async def info_error(ctx: Context, error):
+    if isinstance(error, commands.MissingPermissions):
+        await ctx.reply("Only owner or admin can use this command", ephemeral=True)
+
 
 bot.run(os.environ.get("TOKEN"))
