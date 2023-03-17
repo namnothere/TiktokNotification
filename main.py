@@ -237,26 +237,24 @@ async def before():
         # If it's after 8am, wait until 8am tomorrow
         if hour > 8:
             # create datetime object for 8am tomorrow
-            tomorrow = datetime.datetime.combine(datetime.date.today() + datetime.timedelta(days=1), datetime.time(6, 5))
+            tomorrow = datetime.datetime.combine(jst + datetime.timedelta(days=1), datetime.time(6, 5))
             # Get the difference between now and 8am tomorrow
             diff = tomorrow - datetime.datetime.now()
 
             # Seconds to hours and minutes
 
-            print(f"Waiting {(24 - hour + 8)} hours (appx {diff.seconds}s) to start the loop [Epoch {today.timestamp()}]")
+            print(f"Waiting {(24 - hour + 8)} hours (appx {diff.seconds}s) to start the loop [Epoch {tomorrow.timestamp()}]")
 
             # await asyncio.sleep((24 - hour + 8) * 3600)
             await asyncio.sleep(diff.seconds)
         else:
             
             # create datetime object for 8am today
-            today = datetime.datetime.combine(datetime.date.today(), datetime.time(6, 5))
+            today = datetime.datetime.combine(jst, datetime.time(6, 5))
 
             # Get the difference between now and 8am today
             diff = today - datetime.datetime.now()
 
-            # datetime to epoch
-            print(today.utctimetuple())
 
             print(f"Waiting {(8 - hour)} hours (appx {diff.seconds}s) to start the loop [Epoch {today.timestamp()}]")
             # await asyncio.sleep((8 - hour) * 3600)
